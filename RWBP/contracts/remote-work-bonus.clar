@@ -2,13 +2,15 @@
 ;; A contract for managing remote worker performance and bonuses
 
 ;; Constants
-(define-constant contract-owner tx-sender)
-(define-constant err-owner-only (err u100))
-(define-constant err-not-registered (err u101))
-(define-constant err-already-registered (err u102))
-(define-constant err-task-not-found (err u103))
-(define-constant err-invalid-status (err u104))
-(define-constant err-insufficient-balance (err u105))
+(define-constant CONTRACT_OWNER tx-sender)
+
+;; Error Codes
+(define-constant ERR_OWNER_ONLY (err u100))
+(define-constant ERR_NOT_REGISTERED (err u101))
+(define-constant ERR_ALREADY_REGISTERED (err u102))
+(define-constant ERR_TASK_NOT_FOUND (err u103))
+(define-constant ERR_INVALID_STATUS (err u104))
+(define-constant ERR_INSUFFICIENT_BALANCE (err u105))
 
 ;; Data Variables
 (define-data-var minimum-performance-threshold uint u80)
@@ -47,7 +49,7 @@
 ;; Register new employee
 (define-public (register-employee)
     (let ((sender tx-sender))
-        (asserts! (is-none (get registered (map-get? Employees sender))) (err-already-registered))
+        (asserts! (is-none (get registered (map-get? Employees sender))) ERR_ALREADY_REGISTERED)
         (ok (map-set Employees 
             sender
             {
@@ -67,8 +69,8 @@
                            (description (string-ascii 256))
                            (bonus-amount uint))
     (let ((new-task-id (+ (var-get task-id-counter) u1)))
-        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
-        (asserts! (is-some (map-get? Employees assignee)) err-not-registered)
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_OWNER_ONLY)
+        (asserts! (is-some (map-get? Employees assignee)) ERR_NOT_REGISTERED)
         
         (map-set Tasks new-task-id
             {
@@ -88,11 +90,11 @@
 
 ;; Submit completed task
 (define-public (submit-task (task-id uint))
-    (let ((task (unwrap! (map-get? Tasks task-id) err-task-not-found))
-          (employee (unwrap! (map-get? Employees tx-sender) err-not-registered)))
+    (let ((task (unwrap! (map-get? Tasks task-id) ERR_TASK_NOT_FOUND))
+          (employee (unwrap! (map-get? Employees tx-sender) ERR_NOT_REGISTERED)))
         
-        (asserts! (is-eq (get assignee task) tx-sender) err-owner-only)
-        (asserts! (is-eq (get status task) "ASSIGNED") err-invalid-status)
+        (asserts! (is-eq (get assignee task) tx-sender) ERR_OWNER_ONLY)
+        (asserts! (is-eq (get status task) "ASSIGNED") ERR_INVALID_STATUS)
         
         (map-set Tasks task-id
             (merge task { status: "SUBMITTED" })
@@ -108,11 +110,11 @@
 
 ;; Review and approve task
 (define-public (review-task (task-id uint) (approved bool) (quality-score uint))
-    (let ((task (unwrap! (map-get? Tasks task-id) err-task-not-found))
-          (employee (unwrap! (map-get? Employees (get assignee task)) err-not-registered)))
+    (let ((task (unwrap! (map-get? Tasks task-id) ERR_TASK_NOT_FOUND))
+          (employee (unwrap! (map-get? Employees (get assignee task)) ERR_NOT_REGISTERED)))
         
-        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
-        (asserts! (is-eq (get status task) "SUBMITTED") err-invalid-status)
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_OWNER_ONLY)
+        (asserts! (is-eq (get status task) "SUBMITTED") ERR_INVALID_STATUS)
         
         (if approved
             (begin
@@ -163,9 +165,9 @@
 
 ;; Release bonus payment
 (define-private (release-bonus (recipient principal) (amount uint))
-    (let ((balance (stx-get-balance contract-owner)))
-        (asserts! (>= balance amount) err-insufficient-balance)
-        (try! (stx-transfer? amount contract-owner recipient))
+    (let ((balance (stx-get-balance CONTRACT_OWNER)))
+        (asserts! (>= balance amount) ERR_INSUFFICIENT_BALANCE)
+        (try! (stx-transfer? amount CONTRACT_OWNER recipient))
         (ok true)
     )
 )
